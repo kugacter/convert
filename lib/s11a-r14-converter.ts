@@ -209,9 +209,28 @@ function xmlNodeToJson(element: Element): any {
     childGroups[localName].push(child)
   })
 
+  const parentName = element.tagName
+  const parentColonIndex = parentName.indexOf(":")
+  const parentLocalName = parentColonIndex !== -1 ? parentName.substring(parentColonIndex + 1) : parentName
+
+  const FORCE_ARRAY_PARENTS = [
+    "QHTD",
+    "HDTD",
+    "DUNO_THETD",
+    "DUNO_VAMC",
+    "DUNO_12THANG",
+    "NHOM2_12THANG",
+    "NOXAU_60THANG",
+    "LS_TRACUU_12THANG",
+    "TCTD_PHATHANH_THE",
+    "DUNO_THETD_12THANG",
+    "THETD_CHAMTT_36THANG"
+  ]
+  const shouldForceArray = FORCE_ARRAY_PARENTS.includes(parentLocalName)
+
   Object.keys(childGroups).forEach((tagName) => {
     const elements = childGroups[tagName]
-    if (elements.length === 1) {
+    if (elements.length === 1 && !shouldForceArray) {
       result[tagName] = xmlNodeToJson(elements[0])
     } else {
       result[tagName] = elements.map((el) => xmlNodeToJson(el))
@@ -294,9 +313,9 @@ export function convertXmlToJson(xmlStr: string): string {
       header: null,
       body: {
         PHVanTinDSPhieu: {
-          TTPhanHoi,
+          TTPhanHoi: ttPhanHoi,
           DSKhachHangKQ: {
-            DongKQ,
+            DongKQ: dongKQ,
           },
         },
       },
