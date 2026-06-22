@@ -49,8 +49,17 @@ import {
 import { sortJsonText } from '@/lib/sort-json-keys'
 import { usePersistedState } from '@/hooks/use-persisted-state'
 import { CONTENT_KEYS } from '@/lib/content-persistence'
+import { convertJsonToXml, convertXmlToJson, SAMPLE_JSON_S11A_R14 } from '@/lib/s11a-r14-converter'
 
-function resolveJsonInput(inputText: string, conversionType: 'CIC' | 'PCB') {
+function resolveJsonInput(inputText: string, conversionType: 'CIC' | 'PCB' | 'S11A_R14') {
+  if (conversionType === 'S11A_R14') {
+    const parsed = JSON.parse(inputText)
+    return {
+      parsed,
+      preprocessed: parsed,
+      workingText: inputText,
+    }
+  }
   const parsed = JSON.parse(inputText)
   const preprocessed = preprocessConverterJsonInput(parsed, conversionType)
   return {
@@ -66,12 +75,17 @@ export default function ConverterPage() {
 
   const [input, setInput, clearInput] = usePersistedState(CONTENT_KEYS.converterInput)
   const [output, setOutput] = useState('')
-  const [conversionType, setConversionType] = useState<'CIC' | 'PCB'>('CIC')
+  const [conversionType, setConversionType] = useState<'CIC' | 'PCB' | 'S11A_R14'>('CIC')
   const [isConverting, setIsConverting] = useState(false)
   const [conversionError, setConversionError] = useState('')
   const [autoConvertEnabled, setAutoConvertEnabled] = useState(true)
   const [copyStates, setCopyStates] = useState<{ [key: string]: boolean }>({})
   const [wordWrapEnabled, setWordWrapEnabled] = useState(false)
+
+  // S11a/R14 options state
+  const [s11aXpath, setS11aXpath] = useState(true)
+  const [s11aFaker, setS11aFaker] = useState(true)
+  const [s11aConvertPipe, setS11aConvertPipe] = useState(true)
 
   const [isAdvancedPopoverOpen, setIsAdvancedPopoverOpen] = useState(false)
   const [advancedOptions, setAdvancedOptions] = useState({
@@ -90,6 +104,34 @@ export default function ConverterPage() {
     if (!inputText.trim()) {
       setOutput('')
       setConversionError('')
+      return
+    }
+
+    if (conversionType === 'S11A_R14') {
+      setIsConverting(true)
+      setConversionError('')
+      try {
+        const type = detectType(inputText)
+        if (type === 'json') {
+          const xml = convertJsonToXml(inputText, {
+            useXpath: s11aXpath,
+            useFaker: s11aFaker,
+            convertPipe: s11aConvertPipe
+          })
+          setOutput(xml)
+        } else if (type === 'xml') {
+          const json = convertXmlToJson(inputText)
+          setOutput(json)
+        } else {
+          throw new Error('Dữ liệu đầu vào phải là định dạng XML hoặc JSON hợp lệ.')
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Lỗi chuyển đổi S11a/R14'
+        setConversionError(errorMessage)
+        setOutput('')
+      } finally {
+        setIsConverting(false)
+      }
       return
     }
 
@@ -462,12 +504,12 @@ export default function ConverterPage() {
       handleAutoConvert(input)
     }, 500)
     return () => clearTimeout(timeoutId)
-  }, [input, autoConvertEnabled])
+  }, [input, autoConvertEnabled, s11aXpath, s11aFaker, s11aConvertPipe])
 
   useEffect(() => {
     if (!autoConvertEnabled || !input.trim()) return
     handleAutoConvert(input)
-  }, [conversionType])
+  }, [conversionType, s11aXpath, s11aFaker, s11aConvertPipe])
 
   useEffect(() => {
     if (
@@ -1080,7 +1122,7 @@ export default function ConverterPage() {
             <div className='flex items-center gap-4'>
               <Select
                 value={conversionType}
-                onValueChange={(value: 'CIC' | 'PCB') =>
+                onValueChange={(value: 'CIC' | 'PCB' | 'S11A_R14') =>
                   setConversionType(value)
                 }
               >
@@ -1101,6 +1143,12 @@ export default function ConverterPage() {
                     className='dark:text-gray-200 dark:hover:bg-gray-600'
                   >
                     PCB
+                  </SelectItem>
+                  <SelectItem
+                    value='S11A_R14'
+                    className='dark:text-gray-200 dark:hover:bg-gray-600'
+                  >
+                    S11a/R14
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -1133,6 +1181,49 @@ export default function ConverterPage() {
           </div>
         </CardHeader>
         <CardContent className='dark:text-gray-200'>
+          {conversionType === 'S11A_R14' && (
+            <div className="flex flex-wrap gap-6 pb-4 mb-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="s11a-xpath"
+                  checked={s11aXpath}
+                  onCheckedChange={setS11aXpath}
+                />
+                <label
+                  htmlFor="s11a-xpath"
+                  className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                >
+                  Dùng {"${BODY_XPATH}"} cho MaSoPhieu
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="s11a-faker"
+                  checked={s11aFaker}
+                  onCheckedChange={setS11aFaker}
+                />
+                <label
+                  htmlFor="s11a-faker"
+                  className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                >
+                  Dùng {"${FAKER}"} cho NgayHoi/NgayNhanGanNhat
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="s11a-br"
+                  checked={s11aConvertPipe}
+                  onCheckedChange={setS11aConvertPipe}
+                />
+                <label
+                  htmlFor="s11a-br"
+                  className="text-xs font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                >
+                  {"Convert \"|\" → <br/> (trong NHOM2)"}
+                </label>
+              </div>
+            </div>
+          )}
           <div className='grid grid-cols-1 lg:grid-cols-12 gap-6'>
             <div className='lg:col-span-5 space-y-4'>
               <div className='flex items-center justify-between'>
@@ -1149,7 +1240,21 @@ export default function ConverterPage() {
                     </span>
                   )}
                 </div>
-                <div className='flex gap-2'>
+                 <div className='flex gap-2'>
+                  {conversionType === 'S11A_R14' && (
+                    <Button
+                      onClick={() => {
+                        const sampleText = JSON.stringify(SAMPLE_JSON_S11A_R14, null, 2)
+                        setInput(sampleText)
+                        toast({ title: 'Đã tải mẫu', description: 'Định dạng JSON mẫu S11a/R14.' })
+                      }}
+                      variant='outline'
+                      size='sm'
+                      className='dark:border-gray-600 text-indigo-600 dark:text-indigo-400 font-semibold'
+                    >
+                      Sample
+                    </Button>
+                  )}
                   <Button
                     onClick={() => inputFileRef.current?.click()}
                     variant='outline'
