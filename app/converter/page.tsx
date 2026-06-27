@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import {
@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Upload, Download, Copy, Trash2, RefreshCw, Check, ArrowDownAZ, ArrowUpAZ } from 'lucide-react'
+import { Copy, Trash2, RefreshCw, Check } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
   Popover,
@@ -33,7 +33,6 @@ import {
 
 import {
   detectType,
-  formatJson,
   formatXml,
   xmlElementToJson,
   jsonToXmlElement,
@@ -46,7 +45,7 @@ import {
   hasPcbPasteStructure,
   hasCicPasteStructure,
 } from '@/lib/xml-json-utils'
-import { sortJsonText } from '@/lib/sort-json-keys'
+import { EditorToolbar } from '@/components/editor-toolbar'
 import { usePersistedState } from '@/hooks/use-persisted-state'
 import { CONTENT_KEYS } from '@/lib/content-persistence'
 import { convertJsonToXml, convertXmlToJson, SAMPLE_JSON_S11A_R14 } from '@/lib/s11a-r14-converter'
@@ -61,7 +60,10 @@ function resolveJsonInput(inputText: string, conversionType: 'CIC' | 'PCB' | 'S1
     }
   }
   const parsed = JSON.parse(inputText)
-  const preprocessed = preprocessConverterJsonInput(parsed, conversionType)
+  const preprocessed = preprocessConverterJsonInput(
+    parsed,
+    conversionType as 'CIC' | 'PCB',
+  )
   return {
     parsed,
     preprocessed,
@@ -71,7 +73,6 @@ function resolveJsonInput(inputText: string, conversionType: 'CIC' | 'PCB' | 'S1
 
 export default function ConverterPage() {
   const { toast } = useToast()
-  const inputFileRef = useRef<HTMLInputElement>(null)
 
   const [input, setInput, clearInput] = usePersistedState(CONTENT_KEYS.converterInput)
   const [output, setOutput] = useState('')
@@ -79,7 +80,7 @@ export default function ConverterPage() {
   const [isConverting, setIsConverting] = useState(false)
   const [conversionError, setConversionError] = useState('')
   const [autoConvertEnabled, setAutoConvertEnabled] = useState(true)
-  const [copyStates, setCopyStates] = useState<{ [key: string]: boolean }>({})
+  const [xpathCopied, setXpathCopied] = useState(false)
   const [wordWrapEnabled, setWordWrapEnabled] = useState(false)
 
   // S11a/R14 options state
@@ -807,39 +808,13 @@ export default function ConverterPage() {
     return () => clearTimeout(timeout)
   }, [cicCodeInput, advancedOptions.active])
 
-  const handleFileUpload = (file: File, setter: (value: string) => void) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      setter(content)
-      toast({ title: 'Success', description: `Loaded file ${file.name}` })
-    }
-    reader.readAsText(file)
-  }
-
-  const downloadFile = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    toast({ title: 'Success', description: `Downloaded ${filename}` })
-  }
-
-  const copyToClipboard = async (text: string, buttonId = 'default') => {
+  const copyXpathToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      setCopyStates((prev) => ({ ...prev, [buttonId]: true }))
-      setTimeout(
-        () => setCopyStates((prev) => ({ ...prev, [buttonId]: false })),
-        2000,
-      )
+      setXpathCopied(true)
+      setTimeout(() => setXpathCopied(false), 2000)
       toast({ title: 'Copied', description: 'Content copied to clipboard' })
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to copy to clipboard',
@@ -1105,9 +1080,9 @@ export default function ConverterPage() {
                           size='icon'
                           variant='ghost'
                           className='h-7 w-7'
-                          onClick={() => copyToClipboard(outputXPath, 'xpath')}
+                          onClick={() => copyXpathToClipboard(outputXPath)}
                         >
-                          {copyStates['xpath'] ? (
+                          {xpathCopied ? (
                             <Check className='h-4 w-4 text-green-600' />
                           ) : (
                             <Copy className='h-4 w-4' />
@@ -1225,91 +1200,51 @@ export default function ConverterPage() {
             </div>
           )}
           <div className='grid grid-cols-1 lg:grid-cols-12 gap-6'>
-            <div className='lg:col-span-5 space-y-4'>
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center w-full gap-2'>
-                  <h3 className='text-lg font-semibold dark:text-gray-200'>
-                    Input
-                  </h3>
+            <div className='lg:col-span-5 space-y-3'>
+              <div className='flex items-center gap-2 flex-wrap'>
+                <h3 className='text-lg font-semibold dark:text-gray-200'>
+                  Input
+                </h3>
+                <span className='text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-300'>
+                  {input.trim() ? detectType(input).toUpperCase() : 'TEXT'}
+                </span>
+                {inquiryLabel && (
                   <span className='text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-300'>
-                    {input.trim() ? detectType(input).toUpperCase() : 'TEXT'}
+                    {inquiryLabel}
                   </span>
-                  {inquiryLabel && (
-                    <span className='text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-300 ml-2'>
-                      {inquiryLabel}
-                    </span>
-                  )}
-                </div>
-                 <div className='flex gap-2'>
-                  {conversionType === 'S11A_R14' && (
-                    <Button
-                      onClick={() => {
-                        const sampleText = JSON.stringify(SAMPLE_JSON_S11A_R14, null, 2)
-                        setInput(sampleText)
-                        toast({ title: 'Đã tải mẫu', description: 'Định dạng JSON mẫu S11a/R14.' })
-                      }}
-                      variant='outline'
-                      size='sm'
-                      className='dark:border-gray-600 text-indigo-600 dark:text-indigo-400 font-semibold'
-                    >
-                      Sample
-                    </Button>
-                  )}
-                  <Button
-                    onClick={() => inputFileRef.current?.click()}
-                    variant='outline'
-                    size='sm'
-                    className='dark:border-gray-600'
-                  >
-                    <Upload className='h-4 w-4 mr-2' /> Upload
-                  </Button>
+                )}
+              </div>
+              <div className='flex flex-wrap items-center gap-2'>
+                {conversionType === 'S11A_R14' && (
                   <Button
                     onClick={() => {
-                      const type = detectType(input)
-                      if (type === 'json') setInput(formatJson(input))
-                      else if (type === 'xml') setInput(formatXml(input))
+                      const sampleText = JSON.stringify(SAMPLE_JSON_S11A_R14, null, 2)
+                      setInput(sampleText)
+                      toast({
+                        title: 'Đã tải mẫu',
+                        description: 'Định dạng JSON mẫu S11a/R14.',
+                      })
                     }}
                     variant='outline'
                     size='sm'
-                    className='dark:border-gray-600'
-                    disabled={
-                      !input.trim() ||
-                      !['json', 'xml'].includes(detectType(input))
-                    }
+                    className='h-8 dark:border-gray-600 text-indigo-600 dark:text-indigo-400 font-semibold shrink-0'
                   >
-                    <RefreshCw className='h-4 w-4 mr-2' /> Format
+                    Sample
                   </Button>
-                  <Button
-                    onClick={() => setInput(sortJsonText(input, 'asc'))}
-                    variant='outline'
-                    size='sm'
-                    className='dark:border-gray-600'
-                    disabled={!input.trim() || detectType(input) !== 'json'}
-                    title='Sort JSON keys (0-9, A-Z)'
-                  >
-                    <ArrowDownAZ className='h-4 w-4 mr-2' /> 0-Z
-                  </Button>
-                  <Button
-                    onClick={() => setInput(sortJsonText(input, 'desc'))}
-                    variant='outline'
-                    size='sm'
-                    className='dark:border-gray-600'
-                    disabled={!input.trim() || detectType(input) !== 'json'}
-                    title='Sort JSON keys (Z-A, 9-0)'
-                  >
-                    <ArrowUpAZ className='h-4 w-4 mr-2' /> Z-0
-                  </Button>
-                  <input
-                    ref={inputFileRef}
-                    type='file'
-                    accept='.txt,.xml,.json'
-                    className='hidden'
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) handleFileUpload(file, setInput)
-                    }}
-                  />
-                </div>
+                )}
+                <EditorToolbar
+                  value={input}
+                  onChange={setInput}
+                  onUploaded={(filename) =>
+                    toast({ title: 'Success', description: `Loaded file ${filename}` })
+                  }
+                  onAction={(action) => {
+                    if (action === 'format') toast({ title: 'Formatted', description: 'Input formatted.' })
+                    if (action === 'minify') toast({ title: 'Copied', description: 'Minified content copied to clipboard.' })
+                    if (action === 'sortAsc') toast({ title: 'Sorted', description: 'JSON keys sorted 0-Z.' })
+                    if (action === 'sortDesc') toast({ title: 'Sorted', description: 'JSON keys sorted Z-0.' })
+                  }}
+                />
               </div>
               <TextareaWithLineNumbers
                 value={input}
@@ -1372,53 +1307,45 @@ export default function ConverterPage() {
               </div>
             </div>
 
-            <div className='lg:col-span-5 space-y-4'>
-              <div className='flex items-center justify-between'>
-                <div className='flex items-center w-full'>
-                  <h3 className='text-lg font-semibold dark:text-gray-200'>
-                    Result
-                  </h3>
-                  <span className='text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-300 ml-4'>
-                    {output.trim()
-                      ? detectType(input) === 'xml'
-                        ? 'JSON'
-                        : detectType(input) === 'json'
-                          ? 'XML'
-                          : 'TEXT'
-                      : 'TEXT'}
-                  </span>
-                </div>
-                <div className='flex gap-2'>
-                  <Button
-                    onClick={() => copyToClipboard(output, 'output')}
-                    variant='outline'
-                    size='sm'
-                    className='dark:border-gray-600'
-                    disabled={!output}
-                  >
-                    {copyStates['output'] ? (
-                      <Check className='h-4 w-4 text-green-600 mr-2' />
-                    ) : (
-                      <Copy className='h-4 w-4 mr-2' />
-                    )}{' '}
-                    Copy
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      downloadFile(
-                        output,
-                        `${conversionType.toLowerCase()}_result.${detectType(input) === 'xml' ? 'json' : detectType(input) === 'json' ? 'xml' : 'txt'}`,
-                      )
-                    }
-                    variant='outline'
-                    size='sm'
-                    className='dark:border-gray-600'
-                    disabled={!output}
-                  >
-                    <Download className='h-4 w-4 mr-2' /> Export
-                  </Button>
-                </div>
+            <div className='lg:col-span-5 space-y-3'>
+              <div className='flex items-center gap-2 flex-wrap'>
+                <h3 className='text-lg font-semibold dark:text-gray-200'>
+                  Result
+                </h3>
+                <span className='text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-300'>
+                  {output.trim()
+                    ? detectType(input) === 'xml'
+                      ? 'JSON'
+                      : detectType(input) === 'json'
+                        ? 'XML'
+                        : 'TEXT'
+                    : 'TEXT'}
+                </span>
               </div>
+              <EditorToolbar
+                value={output}
+                onChange={setOutput}
+                features={['format', 'minify', 'sortAsc', 'sortDesc', 'copy', 'export']}
+                exportFilename={`${conversionType.toLowerCase()}_result.${
+                  detectType(input) === 'xml'
+                    ? 'json'
+                    : detectType(input) === 'json'
+                      ? 'xml'
+                      : 'txt'
+                }`}
+                onCopied={() =>
+                  toast({ title: 'Copied', description: 'Content copied to clipboard.' })
+                }
+                onExported={(filename) =>
+                  toast({ title: 'Success', description: `Downloaded ${filename}` })
+                }
+                onAction={(action) => {
+                  if (action === 'format') toast({ title: 'Formatted', description: 'Result formatted.' })
+                  if (action === 'minify') toast({ title: 'Copied', description: 'Minified content copied to clipboard.' })
+                  if (action === 'sortAsc') toast({ title: 'Sorted', description: 'JSON keys sorted 0-Z.' })
+                  if (action === 'sortDesc') toast({ title: 'Sorted', description: 'JSON keys sorted Z-0.' })
+                }}
+              />
               {conversionError ? (
                 <div className='min-h-[500px] border rounded-md p-4 bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'>
                   <div className='text-red-600 dark:text-red-400 font-medium mb-2'>
@@ -1431,9 +1358,9 @@ export default function ConverterPage() {
               ) : (
                 <TextareaWithLineNumbers
                   value={output}
+                  onChange={(e) => setOutput(e.target.value)}
                   placeholder='Result will appear here automatically...'
                   className='min-h-[500px] text-sm bg-muted dark:bg-gray-700'
-                  readOnly={true}
                   wordWrap={wordWrapEnabled}
                 />
               )}

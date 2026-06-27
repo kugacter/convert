@@ -25,6 +25,7 @@ interface CompareWorkspaceSectionProps {
   onOptionsChange: (options: CompareOptions) => void
   onCompare: () => void
   onFormatBoth?: () => void
+  onMinifyBoth?: () => void
   onSortBothAsc?: () => void
   onSortBothDesc?: () => void
   onLoadExample?: () => void
@@ -32,7 +33,6 @@ interface CompareWorkspaceSectionProps {
   onSelectPath: (path: string | null) => void
   onCopy: (diffs: JsonDiffResult[]) => void
   onDownloadCsv: (diffs: JsonDiffResult[]) => void
-  showManualActions?: boolean
 }
 
 export function CompareWorkspaceSection({
@@ -48,6 +48,7 @@ export function CompareWorkspaceSection({
   onOptionsChange,
   onCompare,
   onFormatBoth,
+  onMinifyBoth,
   onSortBothAsc,
   onSortBothDesc,
   onLoadExample,
@@ -55,7 +56,6 @@ export function CompareWorkspaceSection({
   onSelectPath,
   onCopy,
   onDownloadCsv,
-  showManualActions = false,
 }: CompareWorkspaceSectionProps) {
   const editorsSectionRef = useRef<HTMLDivElement>(null)
 
@@ -96,17 +96,15 @@ export function CompareWorkspaceSection({
       </div>
 
       <div className='flex gap-4'>
-        {showManualActions && (
-          <CompareActionBar
-            onCompare={onCompare}
-            onFormatBoth={onFormatBoth}
-            onSortBothAsc={onSortBothAsc}
-            onSortBothDesc={onSortBothDesc}
-            onLoadExample={onLoadExample}
-            onClearAll={onClear}
-            showManualActions={showManualActions}
-          />
-        )}
+        <CompareActionBar
+          onCompare={onCompare}
+          onFormatBoth={onFormatBoth}
+          onMinifyBoth={onMinifyBoth}
+          onSortBothAsc={onSortBothAsc}
+          onSortBothDesc={onSortBothDesc}
+          onLoadExample={onLoadExample}
+          onClearAll={onClear}
+        />
 
         <CompareOptionsPanel options={options} onChange={onOptionsChange} />
       </div>

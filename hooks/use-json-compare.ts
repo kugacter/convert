@@ -7,6 +7,7 @@ import {
   buildDiffCsv,
   downloadTextFile,
   formatJsonText,
+  minifyJsonText,
   runCompare,
   sortJsonText,
 } from "@/lib/json-compare/compare-helpers"
@@ -23,6 +24,7 @@ import {
 } from "@/lib/json-compare/array-batch"
 import { extractBodyVariableRefs } from "@/lib/json-compare/body-field-utils"
 import { loadJsonCompareSettings, saveJsonCompareSettings } from "@/lib/json-compare/settings-client"
+import { copyToClipboard } from "@/lib/content-actions"
 import {
   clearPersistedContent,
   CONTENT_KEYS,
@@ -174,34 +176,83 @@ export function useJsonCompare() {
     runWorkspaceCompare("api", apiWorkspace.json1, apiWorkspace.json2)
   }, [apiWorkspace.json1, apiWorkspace.json2, runWorkspaceCompare])
 
-  const handleManualFormatBoth = useCallback(() => {
-    try {
-      if (manual.json1.trim()) updateManual({ json1: formatJsonText(manual.json1) })
-      if (manual.json2.trim()) updateManual({ json2: formatJsonText(manual.json2) })
-      updateManual({ summary: { type: "ok", message: "Formatted both JSONs successfully." } })
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Format failed"
-      updateManual({ summary: { type: "error", message } })
-    }
-  }, [manual.json1, manual.json2, updateManual])
+  const applyWorkspaceContentAction = useCallback(
+    (
+      mode: CompareMode,
+      transform: (text: string) => string,
+      successMessage: string,
+      errorLabel: string
+    ) => {
+      const json1 = mode === "manual" ? manual.json1 : apiWorkspace.json1
+      const json2 = mode === "manual" ? manual.json2 : apiWorkspace.json2
+      const updater = mode === "manual" ? updateManual : updateApiWorkspace
 
-  const handleManualSortBoth = useCallback(
-    (direction: "asc" | "desc") => {
       try {
-        if (manual.json1.trim()) updateManual({ json1: sortJsonText(manual.json1, direction) })
-        if (manual.json2.trim()) updateManual({ json2: sortJsonText(manual.json2, direction) })
-        const label = direction === "asc" ? "0-9, A-Z" : "Z-A, 9-0"
-        updateManual({ summary: { type: "ok", message: `Sorted JSON keys (${label}) in both panels.` } })
+        const patch: Partial<CompareWorkspace> = {}
+        if (json1.trim()) patch.json1 = transform(json1)
+        if (json2.trim()) patch.json2 = transform(json2)
+        updater({ ...patch, summary: { type: "ok", message: successMessage } })
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : "Sort failed"
-        updateManual({ summary: { type: "error", message } })
+        const message = error instanceof Error ? error.message : `${errorLabel} failed`
+        updater({ summary: { type: "error", message } })
       }
     },
-    [manual.json1, manual.json2, updateManual]
+    [manual.json1, manual.json2, apiWorkspace.json1, apiWorkspace.json2, updateManual, updateApiWorkspace]
   )
 
-  const handleManualSortBothAsc = useCallback(() => handleManualSortBoth("asc"), [handleManualSortBoth])
-  const handleManualSortBothDesc = useCallback(() => handleManualSortBoth("desc"), [handleManualSortBoth])
+  const createWorkspaceBothHandlers = useCallback(
+    (mode: CompareMode) => ({
+      formatBoth: () =>
+        applyWorkspaceContentAction(mode, formatJsonText, "Formatted both JSONs successfully.", "Format"),
+      minifyBoth: async () => {
+        const json1 = mode === "manual" ? manual.json1 : apiWorkspace.json1
+        const json2 = mode === "manual" ? manual.json2 : apiWorkspace.json2
+        const updater = mode === "manual" ? updateManual : updateApiWorkspace
+
+        try {
+          const parts: string[] = []
+          if (json1.trim()) parts.push(minifyJsonText(json1))
+          if (json2.trim()) parts.push(minifyJsonText(json2))
+          if (parts.length === 0) throw new Error("Nothing to minify")
+
+          await copyToClipboard(parts.join("\n\n"))
+          updater({ summary: { type: "ok", message: "Copied minified JSON to clipboard." } })
+          toast({ title: "Copied", description: "Minified content copied to clipboard." })
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : "Minify failed"
+          updater({ summary: { type: "error", message } })
+        }
+      },
+      sortBothAsc: () =>
+        applyWorkspaceContentAction(
+          mode,
+          (text) => sortJsonText(text, "asc"),
+          "Sorted JSON keys (0-9, A-Z) in both panels.",
+          "Sort"
+        ),
+      sortBothDesc: () =>
+        applyWorkspaceContentAction(
+          mode,
+          (text) => sortJsonText(text, "desc"),
+          "Sorted JSON keys (Z-A, 9-0) in both panels.",
+          "Sort"
+        ),
+    }),
+    [applyWorkspaceContentAction, manual.json1, manual.json2, apiWorkspace.json1, apiWorkspace.json2, updateManual, updateApiWorkspace, toast]
+  )
+
+  const manualWorkspaceHandlers = createWorkspaceBothHandlers("manual")
+  const apiWorkspaceHandlers = createWorkspaceBothHandlers("api")
+
+  const handleManualFormatBoth = manualWorkspaceHandlers.formatBoth
+  const handleManualMinifyBoth = manualWorkspaceHandlers.minifyBoth
+  const handleManualSortBothAsc = manualWorkspaceHandlers.sortBothAsc
+  const handleManualSortBothDesc = manualWorkspaceHandlers.sortBothDesc
+
+  const handleApiFormatBoth = apiWorkspaceHandlers.formatBoth
+  const handleApiMinifyBoth = apiWorkspaceHandlers.minifyBoth
+  const handleApiSortBothAsc = apiWorkspaceHandlers.sortBothAsc
+  const handleApiSortBothDesc = apiWorkspaceHandlers.sortBothDesc
 
   const handleManualClear = useCallback(() => {
     setManual(createEmptyWorkspace())
@@ -459,10 +510,15 @@ export function useJsonCompare() {
     handleManualCompare,
     handleApiCompare,
     handleManualFormatBoth,
+    handleManualMinifyBoth,
     handleManualSortBothAsc,
     handleManualSortBothDesc,
     handleManualClear,
     handleManualLoadExample,
+    handleApiFormatBoth,
+    handleApiMinifyBoth,
+    handleApiSortBothAsc,
+    handleApiSortBothDesc,
     handleApiClear,
     handleCallBothAndCompare,
     handleCallCompareWithVariable,

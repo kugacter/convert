@@ -1,40 +1,23 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Upload, RefreshCw, Trash2, ArrowDownAZ, ArrowUpAZ } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { TextareaWithLineNumbers } from "@/components/textarea-with-line-numbers"
 import { createDiff, DiffLine } from "@/lib/diff"
 import { detectType, formatJson, formatXml } from "@/lib/xml-json-utils"
-import { sortJsonText } from "@/lib/sort-json-keys"
 import { usePersistedState } from "@/hooks/use-persisted-state"
 import { CONTENT_KEYS } from "@/lib/content-persistence"
+import { EditorToolbar } from "@/components/editor-toolbar"
+import { TextareaWithLineNumbers } from "@/components/textarea-with-line-numbers"
+import { useToast } from "@/hooks/use-toast"
 import { motion } from "framer-motion"
 
 export default function ComparePage() {
   const { toast } = useToast()
-  
+
   const [compareLeft, setCompareLeft, clearCompareLeft] = usePersistedState(CONTENT_KEYS.compareLeft)
   const [compareRight, setCompareRight, clearCompareRight] = usePersistedState(CONTENT_KEYS.compareRight)
   const [compareWordWrapEnabled, setCompareWordWrapEnabled] = useState(false)
-
-  const compareLeftFileRef = useRef<HTMLInputElement>(null)
-  const compareRightFileRef = useRef<HTMLInputElement>(null)
-
-  const handleFileUpload = (file: File, setter: (value: string) => void) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      setter(content)
-      toast({
-        title: "Success",
-        description: `Loaded file ${file.name}`,
-      })
-    }
-    reader.readAsText(file)
-  }
 
   const renderDiff = (diff: DiffLine[]) => {
     const hasChanges = diff.some((line) => line.type !== "unchanged")
@@ -121,10 +104,10 @@ export default function ComparePage() {
               }`}
             >
               <span className="inline-block w-8 text-gray-400 text-xs mr-2">{line.lineNumber}</span>
-              <span className="inline-block w-4 text-xs mr-2">
+              <span className="inline-block w-4 mr-2">
                 {line.type === "added" ? "+" : line.type === "removed" ? "-" : " "}
               </span>
-              <span className={line.content.trim() === "" ? "text-gray-400" : ""}>{line.content || "⏎"}</span>
+              {line.content}
             </div>
           )
         })}
@@ -141,7 +124,7 @@ export default function ComparePage() {
       className="space-y-6"
     >
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Compare Files</h2>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Compare Tool</h2>
         <p className="text-muted-foreground dark:text-gray-400">
           Find differences between two XML, JSON, or Text files
         </p>
@@ -150,76 +133,21 @@ export default function ComparePage() {
       <Card className="dark:bg-gray-800 dark:border-gray-700 shadow-lg border-gray-200">
         <CardContent className="pt-6 dark:text-gray-200">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            {/* Left Compare */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold dark:text-gray-200">File 1</h3>
-                <div className="flex gap-2 items-center">
-                  <span className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
-                    {detectType(compareLeft).toUpperCase()}
-                  </span>
-                  <Button
-                    onClick={() => compareLeftFileRef.current?.click()}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                  >
-                    <Upload className="h-4 w-4" />
-                    <span className="hidden sm:inline">Upload</span>
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const type = detectType(compareLeft)
-                      if (type === "json") setCompareLeft(formatJson(compareLeft))
-                      else if (type === "xml") setCompareLeft(formatXml(compareLeft))
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                    disabled={!compareLeft.trim() || !["json", "xml"].includes(detectType(compareLeft))}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={() => setCompareLeft(sortJsonText(compareLeft, "asc"))}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                    disabled={!compareLeft.trim() || detectType(compareLeft) !== "json"}
-                    title="Sort JSON keys (0-9, A-Z)"
-                  >
-                    <ArrowDownAZ className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={() => setCompareLeft(sortJsonText(compareLeft, "desc"))}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                    disabled={!compareLeft.trim() || detectType(compareLeft) !== "json"}
-                    title="Sort JSON keys (Z-A, 9-0)"
-                  >
-                    <ArrowUpAZ className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={clearCompareLeft}
-                    variant="outline"
-                    size="sm"
-                    className="dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <input
-                    ref={compareLeftFileRef}
-                    type="file"
-                    accept=".txt,.xml,.json"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) handleFileUpload(file, setCompareLeft)
-                    }}
-                  />
-                </div>
-              </div>
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold dark:text-gray-200">File 1</h3>
+              <EditorToolbar
+                value={compareLeft}
+                onChange={setCompareLeft}
+                onClear={clearCompareLeft}
+                showTypeBadge
+                onUploaded={(filename) =>
+                  toast({ title: "Success", description: `Loaded file ${filename}` })
+                }
+                onAction={(action) => {
+                  if (action === "format") toast({ title: "Formatted", description: "File 1 formatted." })
+                  if (action === "minify") toast({ title: "Copied", description: "Minified content copied to clipboard." })
+                }}
+              />
               <TextareaWithLineNumbers
                 value={compareLeft}
                 onChange={(e) => setCompareLeft(e.target.value)}
@@ -229,76 +157,21 @@ export default function ComparePage() {
               />
             </div>
 
-            {/* Right Compare */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold dark:text-gray-200">File 2</h3>
-                <div className="flex gap-2 items-center">
-                  <span className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 dark:text-gray-300">
-                    {detectType(compareRight).toUpperCase()}
-                  </span>
-                  <Button
-                    onClick={() => compareRightFileRef.current?.click()}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                  >
-                    <Upload className="h-4 w-4" />
-                    <span className="hidden sm:inline">Upload</span>
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const type = detectType(compareRight)
-                      if (type === "json") setCompareRight(formatJson(compareRight))
-                      else if (type === "xml") setCompareRight(formatXml(compareRight))
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                    disabled={!compareRight.trim() || !["json", "xml"].includes(detectType(compareRight))}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={() => setCompareRight(sortJsonText(compareRight, "asc"))}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                    disabled={!compareRight.trim() || detectType(compareRight) !== "json"}
-                    title="Sort JSON keys (0-9, A-Z)"
-                  >
-                    <ArrowDownAZ className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={() => setCompareRight(sortJsonText(compareRight, "desc"))}
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                    disabled={!compareRight.trim() || detectType(compareRight) !== "json"}
-                    title="Sort JSON keys (Z-A, 9-0)"
-                  >
-                    <ArrowUpAZ className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    onClick={clearCompareRight}
-                    variant="outline"
-                    size="sm"
-                    className="dark:border-gray-600 dark:hover:bg-gray-700 dark:text-gray-300"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <input
-                    ref={compareRightFileRef}
-                    type="file"
-                    accept=".txt,.xml,.json"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) handleFileUpload(file, setCompareRight)
-                    }}
-                  />
-                </div>
-              </div>
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold dark:text-gray-200">File 2</h3>
+              <EditorToolbar
+                value={compareRight}
+                onChange={setCompareRight}
+                onClear={clearCompareRight}
+                showTypeBadge
+                onUploaded={(filename) =>
+                  toast({ title: "Success", description: `Loaded file ${filename}` })
+                }
+                onAction={(action) => {
+                  if (action === "format") toast({ title: "Formatted", description: "File 2 formatted." })
+                  if (action === "minify") toast({ title: "Copied", description: "Minified content copied to clipboard." })
+                }}
+              />
               <TextareaWithLineNumbers
                 value={compareRight}
                 onChange={(e) => setCompareRight(e.target.value)}
@@ -309,9 +182,19 @@ export default function ComparePage() {
             </div>
           </div>
 
-          {/* Diff View */}
+          <div className="flex justify-end mb-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCompareWordWrapEnabled((prev) => !prev)}
+              className="dark:border-gray-600 dark:hover:bg-gray-700"
+            >
+              Word Wrap: {compareWordWrapEnabled ? "On" : "Off"}
+            </Button>
+          </div>
+
           {compareLeft && compareRight && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               className="space-y-4 mt-8 pt-6 border-t border-gray-200 dark:border-gray-700"
@@ -347,7 +230,7 @@ export default function ComparePage() {
 
                     const diff = createDiff(left, right)
                     return renderDiff(diff)
-                  } catch (error) {
+                  } catch {
                     return (
                       <div className="text-center py-8 text-yellow-600 font-medium">
                         ⚠ Error during comparison. One of the inputs might have an invalid format.
