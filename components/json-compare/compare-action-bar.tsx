@@ -2,26 +2,26 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Play, RefreshCw, Trash2, ArrowDownAZ, ArrowUpAZ } from "lucide-react"
+import { Play, RefreshCw, Trash2, ArrowDownAZ, ArrowUpAZ, Minimize2 } from "lucide-react"
 
 interface CompareActionBarProps {
   onCompare: () => void
   onFormatBoth?: () => void
+  onMinifyBoth?: () => void
   onSortBothAsc?: () => void
   onSortBothDesc?: () => void
   onLoadExample?: () => void
   onClearAll: () => void
-  showManualActions?: boolean
 }
 
 export function CompareActionBar({
   onCompare,
   onFormatBoth,
+  onMinifyBoth,
   onSortBothAsc,
   onSortBothDesc,
   onLoadExample,
   onClearAll,
-  showManualActions = true,
 }: CompareActionBarProps) {
   return (
     <Card className="dark:bg-gray-800 dark:border-gray-700 shadow-sm border-gray-200">
@@ -29,22 +29,32 @@ export function CompareActionBar({
         <Button onClick={onCompare} className="gap-2 bg-blue-600 hover:bg-blue-700">
           <Play className="w-4 h-4" /> Compare
         </Button>
-        {showManualActions && onFormatBoth && (
+        {onFormatBoth && (
           <Button onClick={onFormatBoth} variant="outline" className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700">
             <RefreshCw className="w-4 h-4" /> Format Both
           </Button>
         )}
-        {showManualActions && onSortBothAsc && (
+        {onMinifyBoth && (
+          <Button
+            onClick={() => void onMinifyBoth()}
+            variant="outline"
+            className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700"
+            title="Copy minified JSON to clipboard"
+          >
+            <Minimize2 className="w-4 h-4" /> Minify Both
+          </Button>
+        )}
+        {onSortBothAsc && (
           <Button onClick={onSortBothAsc} variant="outline" className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700">
             <ArrowDownAZ className="w-4 h-4" /> 0-Z
           </Button>
         )}
-        {showManualActions && onSortBothDesc && (
+        {onSortBothDesc && (
           <Button onClick={onSortBothDesc} variant="outline" className="gap-2 dark:border-gray-600 dark:hover:bg-gray-700">
             <ArrowUpAZ className="w-4 h-4" /> Z-0
           </Button>
         )}
-        {showManualActions && onLoadExample && (
+        {onLoadExample && (
           <Button onClick={onLoadExample} variant="outline" className="dark:border-gray-600 dark:hover:bg-gray-700">
             Example
           </Button>

@@ -1,8 +1,8 @@
 import { compareJsonObjects, type CompareOptions, type JsonDiffResult } from "@/lib/json-compare"
-import { sortJsonText as sortJsonKeysText } from "@/lib/sort-json-keys"
+import { formatContent, minifyContent, sortJsonContent } from "@/lib/content-actions"
 import type { CompareSummary } from "./types"
 
-export { sortJsonKeysText as sortJsonText }
+export { sortJsonContent as sortJsonText }
 
 export function parseJsonInput(text: string, label: string): unknown {
   const raw = text.trim()
@@ -17,7 +17,12 @@ export function parseJsonInput(text: string, label: string): unknown {
 
 export function formatJsonText(text: string): string {
   if (!text.trim()) return text
-  return JSON.stringify(JSON.parse(text), null, 2)
+  return formatContent(text)
+}
+
+export function minifyJsonText(text: string): string {
+  if (!text.trim()) return text
+  return minifyContent(text)
 }
 
 export function runCompare(

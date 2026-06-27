@@ -39,10 +39,15 @@ export default function JsonComparePage() {
     handleManualCompare,
     handleApiCompare,
     handleManualFormatBoth,
+    handleManualMinifyBoth,
     handleManualSortBothAsc,
     handleManualSortBothDesc,
     handleManualClear,
     handleManualLoadExample,
+    handleApiFormatBoth,
+    handleApiMinifyBoth,
+    handleApiSortBothAsc,
+    handleApiSortBothDesc,
     handleApiClear,
     handleCallBothAndCompare,
     handleCallCompareWithVariable,
@@ -93,6 +98,7 @@ export default function JsonComparePage() {
             onOptionsChange={setOptions}
             onCompare={handleManualCompare}
             onFormatBoth={handleManualFormatBoth}
+            onMinifyBoth={handleManualMinifyBoth}
             onSortBothAsc={handleManualSortBothAsc}
             onSortBothDesc={handleManualSortBothDesc}
             onLoadExample={handleManualLoadExample}
@@ -109,7 +115,6 @@ export default function JsonComparePage() {
             }
             onCopy={handleCopyResult}
             onDownloadCsv={handleDownloadCsv}
-            showManualActions
           />
         </TabsContent>
 
@@ -168,6 +173,10 @@ export default function JsonComparePage() {
             onViewModeChange={(viewMode) => updateApiWorkspace({ viewMode })}
             onOptionsChange={setOptions}
             onCompare={handleApiCompare}
+            onFormatBoth={handleApiFormatBoth}
+            onMinifyBoth={handleApiMinifyBoth}
+            onSortBothAsc={handleApiSortBothAsc}
+            onSortBothDesc={handleApiSortBothDesc}
             onClear={handleApiClear}
             onSelectPath={(path) =>
               handleSelectDiffPath(
@@ -181,7 +190,6 @@ export default function JsonComparePage() {
             }
             onCopy={handleCopyResult}
             onDownloadCsv={handleDownloadCsv}
-            showManualActions={false}
           />
         </TabsContent>
       </Tabs>
